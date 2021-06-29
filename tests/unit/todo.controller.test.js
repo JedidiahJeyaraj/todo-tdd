@@ -3,9 +3,12 @@ const TodoModel = require("../../model/todo.model");
 const httpMocks = require("node-mocks-http");
 const newTodo = require("../mock-data/new-todo.json");
 const allTodos = require("../mock-data/all-todos.json");
+const { testEnvironment } = require("../../jest.config");
+const { request } = require("express");
 
 TodoModel.create = jest.fn();
 TodoModel.find = jest.fn();
+TodoModel.findById = jest.fn();
 
 let req, res, next;
 
@@ -13,6 +16,42 @@ beforeEach(() => {
     req = httpMocks.createRequest();
     res = httpMocks.createResponse();
     next = jest.fn();
+});
+
+describe("TodoController.getTodoByID", () => {
+    test("should have a getTodoById", () => {
+        expect(typeof TodoController.getTodoById).toBe("function");
+    });
+
+    test("should call TodoModel.findByID() with route parameters", async () => {
+        req.params.todoId = "60d8c3b216892528109f6e02";
+        await TodoController.getTodoById(req, res, next);
+        expect(TodoModel.findById).toBeCalledWith("60d8c3b216892528109f6e02");
+    });
+
+    test("should return response with status code 200 and the todo", async () => {
+        TodoModel.findById.mockReturnValue(newTodo);
+        req.params.todoId = "60d8c3b216892528109f6e02";
+        await TodoController.getTodoById(req, res, next);
+        expect(res.statusCode).toBe(200);
+        expect(res._isEndCalled()).toBeTruthy();
+        expect(res._getJSONData()).toStrictEqual(newTodo);
+    });
+
+    it("should do error handling", async () => {
+        const errorMessage = { message: "error finding todoModel" };
+        const rejectedPromise = Promise.reject(errorMessage);
+        TodoModel.findById.mockReturnValue(rejectedPromise);
+        await TodoController.getTodoById(req, res, next);
+        expect(next).toHaveBeenCalledWith(errorMessage);
+    });
+
+    test("should return 404 when item doesn't exist", async () => {
+        TodoModel.findById.mockReturnValue(null);
+        await TodoController.getTodoById(req, res, next);
+        expect(res.statusCode).toBe(404);
+        expect(res._isEndCalled()).toBeTruthy();
+    });
 });
 
 describe("TodoController.getTodos", () => {
